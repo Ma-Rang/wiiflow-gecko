@@ -30,7 +30,7 @@ static const char *GameID = (const char*)0x80000000;
 #define APPLDR_CODE		0x918// usblgx uses APPLDR_OFFSET + 0x20 - huh?
 
 void maindolpatches(void *dst, int len, u8 vidMode, GXRModeObj *vmode, bool vipatch, bool countryString, u8 patchVidModes, int aspectRatio, 
-					u32 returnTo, bool patchregion, u8 private_server, const char *server_addr, u8 deflicker, u8 bootType);
+					u8 videoWidth, u32 returnTo, bool patchregion, u8 private_server, const char *server_addr, u8 deflicker, u8 bootType);
 static void patch_NoDiscinDrive(void *buffer, u32 len);
 static void Anti_002_fix(void *Address, int Size);
 static bool Remove_001_Protection(void *Address, int Size);
@@ -103,10 +103,10 @@ u32 Apploader_Run(u8 vidMode, GXRModeObj *vmode, bool vipatch, bool countryStrin
 		WDVD_Read(dst, len, offset);
 		// if server is wiimmfi and game is mario kart wii don't patch private server here, do_new_wiimfi() patches it below.
 		if(private_server == PRIVSERV_WIIMMFI && memcmp("RMC", GameID, 3) == 0)
-			maindolpatches(dst, len, vidMode, vmode, vipatch, countryString, patchVidModes, aspectRatio, returnTo, patchregion, 
+			maindolpatches(dst, len, vidMode, vmode, vipatch, countryString, patchVidModes, aspectRatio, videoWidth, returnTo, patchregion, 
 							0, NULL, deflicker, bootType);
 		else
-			maindolpatches(dst, len, vidMode, vmode, vipatch, countryString, patchVidModes, aspectRatio, returnTo, patchregion, 
+			maindolpatches(dst, len, vidMode, vmode, vipatch, countryString, patchVidModes, aspectRatio, videoWidth, returnTo, patchregion, 
 							private_server,  server_addr, deflicker, bootType);
 			
 		DCFlushRange(dst, len);
@@ -121,9 +121,6 @@ u32 Apploader_Run(u8 vidMode, GXRModeObj *vmode, bool vipatch, bool countryStrin
 	patch_kirby((u8 *)0x80000000);// can't be done during maindolpatches.
 	
 	patch_re4();
-	
-	if(videoWidth == WIDTH_FRAMEBUFFER)
-		patch_width((void*)0x80000000, 0x900000);
 	
 	if(hooktype != 0 && hookpatched)
 		ocarina_do_code();
@@ -153,7 +150,7 @@ u32 Apploader_Run(u8 vidMode, GXRModeObj *vmode, bool vipatch, bool countryStrin
 }
 
 void maindolpatches(void *dst, int len, u8 vidMode, GXRModeObj *vmode, bool vipatch, bool countryString, u8 patchVidModes, int aspectRatio, 
-					u32 returnTo, bool patchregion , u8 private_server, const char *serverAddr, u8 deflicker, u8 bootType)
+					u8 videoWidth, u32 returnTo, bool patchregion , u8 private_server, const char *serverAddr, u8 deflicker, u8 bootType)
 {
 	u8 vfilter_off[7] = {0, 0, 21, 22, 21, 0, 0};
 	u8 vfilter_low[7] = {4, 4, 16, 16, 16, 4, 4};
@@ -182,6 +179,8 @@ void maindolpatches(void *dst, int len, u8 vidMode, GXRModeObj *vmode, bool vipa
 		patch_NoDiscinDrive(dst, len);
 	if(patchregion)
 		PatchRegion(dst, len);
+	if(videoWidth == WIDTH_FRAMEBUFFER)
+		patch_width(dst, len);
 	if(deflicker == DEFLICKER_ON_LOW)
 	{
 		patch_vfilters(dst, len, vfilter_low);

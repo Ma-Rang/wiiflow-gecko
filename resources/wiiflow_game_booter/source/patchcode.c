@@ -723,7 +723,7 @@ u8 *find_safe_space(u8 *addr, u32 len)
         {
             if (*(u32*)(addr_start + 36) == 0x38000001)
             {
-                gprintf("Found safe space (A)\n");
+                //gprintf("Found safe space (A)\n");
                 return addr_start + 36;
             }
         }
@@ -731,7 +731,7 @@ u8 *find_safe_space(u8 *addr, u32 len)
         {
             if (*(u32*)(addr_start + 36) == 0x38000001)
             {
-                gprintf("Found safe space (B)\n");
+                //gprintf("Found safe space (B)\n");
                 return addr_start + 36;
             }
         }
@@ -825,7 +825,7 @@ void PatchFix480p()
         return;
     }
    
-    u8 *patch = find_safe_space(addr, len);
+    u8 *patch = find_safe_space((u8 *)addr, len);
     if (patch)
         patch += 32; // Puts us at "This TV format"
     else
@@ -1451,7 +1451,7 @@ void patch_width(void *addr, u32 len)
         0x40, 0x82, 0x00, 0x08, 0x54, 0xA5, 0x0C, 0x3C};
 	u8 *addr_start = (u8 *)addr;
     u8 *addr_end = addr_start + len - sizeof(SearchPattern);
-    u8 *patch = find_safe_space(addr, len);
+    u8 *patch = find_safe_space((u8 *)addr, len);
 
     if (patch)
         patch += 12; // Puts us at the first crclr
@@ -1482,7 +1482,7 @@ void patch_width(void *addr, u32 len)
                     *(u32 *)(patch + 0x0C) = 0x7C000396 | (reg_a << 21) | (reg_b << 16) | (reg_a << 11);
 
                     *(u32 *)offset = 0x48000000 + (((u32)patch - (u32)offset) & 0x3ffffff);
-                    *(u32 *)(patch + 0x10) = 0x48000000 + ((((u32)offset + 0x04) - ((u32)patch + 0x10)) & 0x3ffffff);
+                    *(u32 *)(patch + 0x10) = 0x48000000 + ((((u32)offset + 0x04) - ((u32)patch + 16)) & 0x3ffffff);
 
                     gprintf("Patched resolution. Branched from 0x%x to 0x%x\n", offset, patch);
                     return;

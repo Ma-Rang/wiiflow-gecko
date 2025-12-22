@@ -46,7 +46,7 @@ void CMenu::_hideDownload(bool instant)
 
 	_hideConfigButtons(instant);
 	
-	m_btnMgr.hide(m_downloadLblGameTDB, instant);
+	//m_btnMgr.hide(m_downloadLblGameTDB, instant);
 	
 	m_btnMgr.hide(m_downloadPBar, instant);
 	m_btnMgr.hide(m_downloadLblDialog, instant);
@@ -89,7 +89,7 @@ void CMenu::_showDownload(void)
 	_hideDownload();
 	
 	_setBg(m_downloadBg, m_downloadBg);
-	m_btnMgr.show(m_downloadLblGameTDB);
+	//m_btnMgr.show(m_downloadLblGameTDB);
 	m_btnMgr.show(m_downloadLblTitle);
 	m_btnMgr.show(m_downloadBtnBack);
 	for(u8 i = 0; i < ARRAY_SIZE(m_downloadLblUser); ++i)
@@ -99,11 +99,11 @@ void CMenu::_showDownload(void)
 	if(!settingsmenu)// first page
 	{
 		m_btnMgr.setText(m_downloadLblTitle, _t("dl5", L"Downloads"));
-		m_btnMgr.setText(m_configLbl1, _t("dl8", L"Covers"));
+		m_btnMgr.setText(m_configLbl1, _t("dl8", L"Wii & GC Covers"));
 		m_btnMgr.setText(m_configBtn1, _t("dl6", L"Download"));
-		m_btnMgr.setText(m_configLbl2, _t("dl15", L"Cover download settings"));
+		m_btnMgr.setText(m_configLbl2, _t("dl15", L"Cover Download Settings"));
 		m_btnMgr.setText(m_configBtn2, _t("dl16", L"Set"));
-		m_btnMgr.setText(m_configLbl3, _t("dl12", L"GameTDB"));
+		m_btnMgr.setText(m_configLbl3, _t("dl12", L"Wii & GC Title Database (wiitdb.xml)"));
 		m_btnMgr.setText(m_configBtn3, _t("dl6", L"Download"));
 		m_btnMgr.setText(m_configLbl4, _t("dl26", L"GC Custom Banners"));
 		m_btnMgr.setText(m_configBtn4, _t("dl6", L"Download"));
@@ -572,7 +572,7 @@ void CMenu::_initDownloadMenu()
 	m_downloadBtnBack = _addButton("DOWNLOAD/BACK_BTN", theme.btnFont, L"", 420, 400, 200, 48, theme.btnFontColor);
 
 	// Download menu
-	m_downloadLblGameTDB = _addLabel("DOWNLOAD/GAMETDB", theme.lblFont, L"", 20, 390, 370, 60, theme.lblFontColor, FTGX_JUSTIFY_LEFT | FTGX_ALIGN_MIDDLE);
+	//m_downloadLblGameTDB = _addLabel("DOWNLOAD/GAMETDB", theme.lblFont, L"", 20, 390, 370, 60, theme.lblFontColor, FTGX_JUSTIFY_LEFT | FTGX_ALIGN_MIDDLE);
 	m_downloadPBar = _addProgressBar("DOWNLOAD/PROGRESS_BAR", 40, 200, 560, 20);
 	m_downloadLblDialog = _addLabel("DOWNLOAD/DIALOG", theme.lblFont, L"", 40, 75, 600, 200, theme.lblFontColor, FTGX_JUSTIFY_LEFT | FTGX_ALIGN_MIDDLE);
 	m_downloadLblMessage = _addLabel("DOWNLOAD/MESSAGE", theme.lblFont, L"", 40, 300, 600, 100, theme.lblFontColor, FTGX_JUSTIFY_CENTER | FTGX_ALIGN_TOP);
@@ -612,7 +612,7 @@ void CMenu::_initDownloadMenu()
 	_setHideAnim(m_downloadLblTitle, "DOWNLOAD/TITLE", 0, 0, -2.f, 0.f);
 	_setHideAnim(m_downloadBtnBack, "DOWNLOAD/BACK_BTN", 0, 0, 1.f, -1.f);
 	
-	_setHideAnim(m_downloadLblGameTDB, "DOWNLOAD/GAMETDB", 50, 0, -2.f, 0.f);
+	//_setHideAnim(m_downloadLblGameTDB, "DOWNLOAD/GAMETDB", 50, 0, -2.f, 0.f);
 	_setHideAnim(m_downloadPBar, "DOWNLOAD/PROGRESS_BAR", 0, 0, -2.f, 0.f);
 	_setHideAnim(m_downloadLblDialog, "DOWNLOAD/DIALOG", 0, 0, -2.f, 0.f);
 	_setHideAnim(m_downloadLblMessage, "DOWNLOAD/MESSAGE", 0, 0, -2.f, 0.f);
@@ -657,7 +657,7 @@ void CMenu::_initDownloadMenu()
 void CMenu::_textDownload(void)
 {
 	m_btnMgr.setText(m_downloadBtnBack, _t("dl18", L"Back"));
-	m_btnMgr.setText(m_downloadLblGameTDB, _t("dl10", L"Please donate\nto GameTDB.com"));
+	//m_btnMgr.setText(m_downloadLblGameTDB, _t("dl10", L"Please donate\nto GameTDB.com"));
 	m_btnMgr.setText(m_downloadLblCoverPrio, _t("dl13", L"Download order"));
 	m_btnMgr.setText(m_downloadLblRegion, _t("dl14", L"Select regions to check for covers:"));
 }
