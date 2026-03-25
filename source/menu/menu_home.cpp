@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 #include "menu.hpp"
+#include "channel/channels.h"
 #include "channel/nand.hpp"
 #include "loader/cios.h"
 #include "loader/nk.h"

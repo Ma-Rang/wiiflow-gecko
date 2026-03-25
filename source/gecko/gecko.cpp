@@ -27,7 +27,14 @@ static ssize_t __out_write(struct _reent *r __attribute__((unused)), void *fd __
 	{
 		u32 level;
 		level = IRQ_Disable();
-		usb_sendbuffer_safe(1, ptr, len);
+		/* Wrap in CMD_DBG frame: [0xDB] [len_hi] [len_lo] [text...] */
+		u8 hdr[3];
+		u16 plen = (len > 0xFFFF) ? 0xFFFF : (u16)len;
+		hdr[0] = 0xDB;
+		hdr[1] = (u8)(plen >> 8);
+		hdr[2] = (u8)(plen & 0xFF);
+		usb_sendbuffer_safe(1, hdr, 3);
+		usb_sendbuffer_safe(1, ptr, plen);
 		IRQ_Restore(level);
 	}
 	return len;

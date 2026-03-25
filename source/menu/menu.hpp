@@ -9,12 +9,10 @@
 
 #include "btnmap.h"
 #include "channel/banner.h"
-#include "channel/channels.h"
-#include "cheats/gct.h"
 #include "devicemounter/DeviceHandler.hpp"
+#include "consolizer/consolizer.hpp"
 #include "fileOps/fileOps.h"
 #include "gecko/gecko.hpp"
-#include "gecko/wifi_gecko.hpp"
 #include "gui/coverflow.hpp"
 #include "gui/cursor.hpp"
 #include "gui/fanart.hpp"
@@ -22,8 +20,6 @@
 #include "list/ListGenerator.hpp"
 #include "loader/disc.h"
 #include "loader/sys.h"
-#include "loader/gc_disc_dump.hpp"
-#include "loader/wbfs.h"
 #include "music/gui_sound.h"
 #include "music/MusicPlayer.hpp"
 #include "plugin/plugin.hpp"
@@ -40,7 +36,7 @@ class CMenu
 {
 public: // functions called from outside CMenu
 	CMenu();
-	bool init(bool usb_mounted);
+	bool init();
 	int main(void);
 	void directlaunch(const char *GameID);
 	
@@ -48,12 +44,11 @@ public: // functions called from outside CMenu
 	const char *getFrontPath(const dir_discHdr *element);
 	const char *getBlankCoverPath(const dir_discHdr *element);
 	
-	// gc_disc_dump
 	u64 m_thrdTotal;
 	void update_pThread(u64 amount, bool add = true);
 	void GC_Messenger(int message, int info, char *cinfo);
-	
-	// proxy settings
+
+	// proxy settings (stubbed — kept for menu_config_main compatibility)
 	bool proxyUseSystem;
 	char proxyAddress[256];
 	u16 proxyPort;
@@ -118,7 +113,6 @@ private:
 	bool m_reload;
 	bool m_use_wifi_gecko;
 	bool m_use_sd_logging;
-	//bool m_init_network;
 	bool m_source_autoboot;
 	dir_discHdr m_autoboot_hdr;
 	s16 m_showtimer;
@@ -163,11 +157,6 @@ private:
 	string m_cartDir;
 	string m_snapDir;
 
-
-// Nand Emulation
-	char emu_nands_dir[32];
-	string m_saveExtGameId;
-	bool m_forceext;
 
 // GC sound stuff
 	bool m_gc_play_banner_sound;
@@ -856,29 +845,7 @@ private:
 	void _checkboxesMenu(u8 md);
 	void _SM_Editor();
 
-//nand emu functions
-	int _FindEmuPart(bool savesnand, bool searchvalid);
-	bool _checkSave(string id, int nand_type);
-	bool _TestEmuNand(int epart, const char *path, bool indept);
-	void _getEmuNands(void);
-	void _FullNandCheck(void);
-	void _listEmuNands(const char *path, vector<string> &nands);
-	int _ExtractGameSave(string gameId);
-	int _FlashGameSave(string gameId);
-	static void * _NandDumper(void *obj);
-	static void * _NandFlasher(void *obj);
-	float m_progress;
-	float m_fprogress;
-	int m_fileprog;
 	int m_filesize;
-	int m_dumpsize;
-	int m_filesdone;
-	int m_foldersdone;
-	int m_nandexentry;
-//explorer menu
-	const char *_FolderExplorer(const char *startPath);
-	void _wadExplorer(void);
-	void _refreshExplorer(s8 direction = 0);
 //source menu
 	void _setSrcOptions(void);
 	void _updateSourceBtns(void);
@@ -920,13 +887,39 @@ private:
 	volatile bool m_thrdUpdated;
 	volatile bool m_thrdDone;
 	vu64 m_thrdWritten;
-// wbfs menu functions
+// wbfs menu functions (stubbed)
 	static void _addDiscProgress(int status, int total, void *user_data);
 	static void _ShowProgress(int dumpstat, int dumpprog, int filestat, int fileprog, int files, int folders, const char *tmess, void *user_data);
 	static void * _gameInstaller(void *obj);
 	static void * _GCcopyGame(void *obj);
 	bool _searchGamesByID(const char *gameId);
 	int _GCgameInstaller();
+//nand emu functions (stubbed)
+	int _FindEmuPart(bool savesnand, bool searchvalid);
+	bool _checkSave(string id, int nand_type);
+	bool _TestEmuNand(int epart, const char *path, bool indept);
+	void _getEmuNands(void);
+	void _FullNandCheck(void);
+	void _listEmuNands(const char *path, vector<string> &nands);
+	int _ExtractGameSave(string gameId);
+	int _FlashGameSave(string gameId);
+	static void * _NandDumper(void *obj);
+	static void * _NandFlasher(void *obj);
+	float m_progress;
+	float m_fprogress;
+	int m_fileprog;
+	int m_dumpsize;
+	int m_filesdone;
+	int m_foldersdone;
+	int m_nandexentry;
+//explorer menu (stubbed)
+	const char *_FolderExplorer(const char *startPath);
+	void _wadExplorer(void);
+	void _refreshExplorer(s8 direction = 0);
+// nand emu vars (stubbed)
+	char emu_nands_dir[32];
+	string m_saveExtGameId;
+	bool m_forceext;
 // game selected menu functions
 	void _extractBnr(const dir_discHdr *hdr);
 	void _setCurrentItem(const dir_discHdr *hdr);
@@ -946,11 +939,6 @@ private:
 	
 // gamelist functions
 	bool _loadList(void);
-	bool _loadWiiList(void);
-	bool _loadGamecubeList(void);
-	bool _loadChannelList(void);
-	bool _loadPluginList(void);
-	bool _loadHomebrewList(const char *HB_Dir);
 	void _initCF(void);
 	
 //background handling functions
@@ -1008,7 +996,7 @@ private:
 	void _launchShutdown();
 	vector<string> _getMetaXML(const char *bootpath);
 	int _loadGameIOS(u8 ios, int userIOS, const char *id, bool RealNAND_Channels = false);
-	bool _loadFile(u8 * &buffer, u32 &size, const char *path, const char *file);// gameconfig.txt and cheats.gct
+	bool _loadFile(u8 * &buffer, u32 &size, const char *path, const char *file);
 
 //
 	struct SOption { const char id[11]; const wchar_t text[16]; };

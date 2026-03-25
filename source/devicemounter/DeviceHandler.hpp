@@ -25,12 +25,15 @@
 #define DEVICE_HANDLER_HPP_
 
 #include "PartitionHandle.h"
-#include "usbstorage.h"
-#include "libwbfs/libwbfs.h"
 
-/**
- * libogc device names.
- */
+enum
+{
+	PART_FS_FAT = 0,
+	PART_FS_NTFS,
+	PART_FS_EXT,
+	PART_FS_WBFS,
+};
+
 enum
 {
 	SD = 0,
@@ -45,9 +48,6 @@ enum
 	MAXDEVICES
 };
 
-/**
- * libogc device names.
- */
 const char DeviceName[MAXDEVICES][8] =
 {
 	"sd",
@@ -65,46 +65,25 @@ class DeviceHandler
 {
 public:
 	void Init();
-	void SetModes();
-	void SetMountUSB(bool using_usb);
 	void MountAll();
 	void UnMountAll();
-	bool Mount(int dev);
 	bool IsInserted(int dev);
-	void UnMount(int dev);
 
-	//! Individual Mounts/UnMounts...
 	bool MountSD();
-	bool MountAllUSB();
-	bool MountUSBPort1();
-
 	bool SD_Inserted() { return sd.IsInserted(); }
-	bool USB_Inserted() { return usb.IsInserted(); }
-	bool UsablePartitionMounted();
-	bool PartitionUsableForNandEmu(int Partition);
-	bool WaitForDevice(const DISC_INTERFACE *Handle);
-
 	void UnMountSD() { sd.UnMountAll(); }
-	void UnMountUSB(int pos);
-	void UnMountAllUSB();
-
-	PartitionHandle *GetUSBHandleFromPartition(int part);
-	const DISC_INTERFACE *GetUSBInterface();
 
 	int PathToDriveType(const char *path);
-	const char * GetFSName(int dev);
+	const char *GetFSName(int dev);
 	int GetFSType(int dev);
-	u16 GetUSBPartitionCount();
 	const char *PathToFSName(const char *path) { return GetFSName(PathToDriveType(path)); }
-	wbfs_t *GetWbfsHandle(int dev);
-	s32 OpenWBFS(int dev);
+
+	/* Stubs for removed WBFS/USB/Nand functionality */
+	void OpenWBFS(int dev) { (void)dev; }
+	bool PartitionUsableForNandEmu(int dev) { (void)dev; return false; }
 
 private:
-	bool MountUSB(int part);
-	bool mount_usb;
-
 	PartitionHandle sd;
-	PartitionHandle usb;
 };
 
 extern DeviceHandler DeviceHandle;

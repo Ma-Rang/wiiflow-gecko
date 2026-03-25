@@ -25,7 +25,6 @@
 #define PARTITION_HANDLE_H
 
 #include <gccore.h>
-#include "libwbfs/libwbfs.h"
 #include <string>
 #include <vector>
 
@@ -112,7 +111,6 @@ typedef struct _PartitionFS {
 	bool Bootable;
 	u8 PartitionType;
 	u8 PartitionNum;
-	wbfs_t *wbfshandle;
 } ATTRIBUTE_PACKED PartitionFS;
 
 
@@ -156,10 +154,6 @@ public:
 	PartitionFS * GetPartitionRecord(int pos) { if(valid(pos)) return &PartitionList[pos]; else return NULL; };
 	//! Get the disc interface of this handle
 	const DISC_INTERFACE * GetDiscInterface() { return interface; };
-	//! Get the wbfs mount handle
-	wbfs_t *GetWbfsHandle(int pos);
-	//! Set the wbfs mount handle
-	bool SetWbfsHandle(int pos, wbfs_t *wbfshandle);
 protected:
 	bool valid(int pos) { return (pos >= 0 && pos < (int)PartitionList.size()); };
 	void AddPartition(const char *name, u64 lba_start, u64 sec_count, bool bootable, u8 part_type, u8 part_num);

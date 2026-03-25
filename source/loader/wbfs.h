@@ -1,50 +1,22 @@
+/* Stub — not used in Dolphin Consolizer build */
 #ifndef _WBFS_H_
 #define _WBFS_H_
 
-#include "libwbfs/libwbfs.h"
-#include "utils.h"
+#include <gctypes.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#define GAMES_DIR "%s:/wbfs"
+#define DF_GC_GAMES_DIR "%s:/games"
 
-/* Macros */
-#define WBFS_MIN_DEVICE		1
-#define WBFS_MAX_DEVICE		2
+extern char wii_games_dir[64];
+extern char gc_games_dir[64];
 
-#define PART_FS_WBFS 0
-#define PART_FS_FAT  1
-#define PART_FS_NTFS 2
-#define PART_FS_EXT  3
+/* WBFS disc stubs */
+typedef void *wbfs_disc_t;
+static inline wbfs_disc_t *WBFS_OpenDisc(u8 *id, char *path) { (void)id; (void)path; return (wbfs_disc_t*)0; }
+static inline void WBFS_CloseDisc(wbfs_disc_t *disc) { (void)disc; }
+static inline u32 wbfs_extract_file(wbfs_disc_t *disc, char *name, void **data) { (void)disc; (void)name; (void)data; return 0; }
+static inline void WBFS_Close(void) {}
 
-extern s32 wbfsDev;
-extern int wbfs_part_fs;
-extern u32 wbfs_part_idx;
-extern u32 wbfs_part_lba;
-extern char wbfs_fs_drive[16];
+extern int currentPartition;
 
-/* Prototypes */
-s32 WBFS_Init(wbfs_t *handle, u32 part_fs, u32 part_idx, u32 part_lba, const char *partition);
-s32 WBFS_CheckGame(u8 *, char *);
-s32 WBFS_AddGame(progress_callback_t spinner, void *spinner_data);
-s32 WBFS_RemoveGame(u8 *, char *);
-s32 WBFS_GameSize(u8 *, char *, f32 *);
-s32 WBFS_DVD_Size(u64 *comp_size, u64 *real_size);
-s32 WBFS_DiskSpace(f32 *, f32 *);
-
-wbfs_disc_t* WBFS_OpenDisc(u8 *discid, char *path);
-void WBFS_CloseDisc(wbfs_disc_t *disc);
-bool WBFS_Close();
-bool WBFS_Mounted();
-
-s32 __WBFS_ReadSDHC(void *fp, u32 lba, u32 count, void *iobuf);
-s32 __WBFS_WriteSDHC(void *fp, u32 lba, u32 count, void *iobuf);
-s32 __WBFS_ReadUSB(void *fp, u32 lba, u32 count, void *iobuf);
-s32 __WBFS_WriteUSB(void *fp, u32 lba, u32 count, void *iobuf);
-s32 __WBFS_ReadDVD(void *fp, u32 lba, u32 count, void *iobuf);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+#endif /* _WBFS_H_ */

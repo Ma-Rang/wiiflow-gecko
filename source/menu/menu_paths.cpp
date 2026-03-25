@@ -1,5 +1,6 @@
 
 #include "menu.hpp"
+#include "loader/wbfs.h"
 
 s16 m_pathsLblTitle;
 s16 m_pathsLblPage;

@@ -1948,19 +1948,19 @@ bool CCoverFlow::start(const string &m_imgsDir)
 	if(!m_dvdskin_loaded)
 	{
 		if(TexHandle.fromImageFile(m_dvdSkin, fmt("%s/dvdskin.png", m_imgsDir.c_str())) != TE_OK)
-			return false;
+			{ gprintf("CF::start: FAILED dvdskin.png from %s\n", m_imgsDir.c_str()); return false; }
 		if(TexHandle.fromImageFile(m_dvdSkin_Red, fmt("%s/dvdskin_red.png", m_imgsDir.c_str())) != TE_OK)
-			return false;
+			{ gprintf("CF::start: FAILED dvdskin_red.png\n"); return false; }
 		if(TexHandle.fromImageFile(m_dvdSkin_Black, fmt("%s/dvdskin_black.png", m_imgsDir.c_str())) != TE_OK)
-			return false;
+			{ gprintf("CF::start: FAILED dvdskin_black.png\n"); return false; }
 		if(TexHandle.fromImageFile(m_dvdSkin_Yellow, fmt("%s/dvdskin_yellow.png", m_imgsDir.c_str())) != TE_OK)
-			return false;
+			{ gprintf("CF::start: FAILED dvdskin_yellow.png\n"); return false; }
 		if(TexHandle.fromImageFile(m_dvdSkin_GreenOne, fmt("%s/dvdskin_greenone.png", m_imgsDir.c_str())) != TE_OK)
-			return false;
+			{ gprintf("CF::start: FAILED dvdskin_greenone.png\n"); return false; }
 		if(TexHandle.fromImageFile(m_dvdSkin_GreenTwo, fmt("%s/dvdskin_greentwo.png", m_imgsDir.c_str())) != TE_OK)
-			return false;
+			{ gprintf("CF::start: FAILED dvdskin_greentwo.png\n"); return false; }
 		if(TexHandle.fromImageFile(m_dvdSkin_Clear, fmt("%s/dvdskin_clear.png", m_imgsDir.c_str())) != TE_OK)
-			return false;
+			{ gprintf("CF::start: FAILED dvdskin_clear.png\n"); return false; }
 		m_dvdskin_loaded = true;
 	}
 	/* load the no pic or loading cover images if not already done */
@@ -1969,22 +1969,22 @@ bool CCoverFlow::start(const string &m_imgsDir)
 		if(m_pngLoadCover.empty() || TexHandle.fromImageFile(m_boxLoadingTexture, m_pngLoadCover.c_str(), GX_TF_CMPR, 32, 512) != TE_OK)
 		{
 			if(TexHandle.fromImageFile(m_boxLoadingTexture, fmt("%s/loading.png", m_imgsDir.c_str()), GX_TF_CMPR, 32, 512) != TE_OK)
-				return false;
+				{ gprintf("CF::start: FAILED loading.png\n"); return false; }
 		}
 		if(m_pngNoCover.empty() || TexHandle.fromImageFile(m_boxNoCoverTexture, m_pngNoCover.c_str(), GX_TF_CMPR, 32, 512) != TE_OK)
 		{
 			if(TexHandle.fromImageFile(m_boxNoCoverTexture, fmt("%s/nopic.png", m_imgsDir.c_str()), GX_TF_CMPR, 32, 512) != TE_OK)
-				return false;
+				{ gprintf("CF::start: FAILED nopic.png\n"); return false; }
 		}
 		if(m_pngLoadCoverFlat.empty() || TexHandle.fromImageFile(m_flatLoadingTexture, m_pngLoadCoverFlat.c_str(), GX_TF_CMPR, 32, 512) != TE_OK)
 		{
 			if(TexHandle.fromImageFile(m_flatLoadingTexture, fmt("%s/flatloading.png", m_imgsDir.c_str()), GX_TF_CMPR, 32, 512) != TE_OK)
-				return false;
+				{ gprintf("CF::start: FAILED flatloading.png\n"); return false; }
 		}
 		if(m_pngNoCoverFlat.empty() || TexHandle.fromImageFile(m_flatNoCoverTexture, m_pngNoCoverFlat.c_str(), GX_TF_CMPR, 32, 512) != TE_OK)
 		{
 			if(TexHandle.fromImageFile(m_flatNoCoverTexture, fmt("%s/flatnopic.png", m_imgsDir.c_str()), GX_TF_CMPR, 32, 512) != TE_OK)
-				return false;
+				{ gprintf("CF::start: FAILED flatnopic.png\n"); return false; }
 		}
 		m_defcovers_loaded = true;
 	}

@@ -19,6 +19,7 @@
 #include "nand_save.hpp"
 #include "nand.hpp"
 #include "gecko/gecko.hpp"
+#include "loader/alt_ios.h"
 #include "loader/fs.h"
 #include "loader/sys.h"
 #include "banner/AnimatedBanner.h"

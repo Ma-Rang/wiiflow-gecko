@@ -90,26 +90,6 @@ struct dir_discHdr
 	u8 wifi;
 } ATTRIBUTE_PACKED;
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
-/* Prototypes */
-s32	Disc_Open(bool);
-s32	Disc_Wait(void);
-s32	Disc_ReadHeader(void *);
-s32 Disc_ReadGCHeader(void *);
-s32 Disc_Type(bool);
-s32	Disc_IsWii(void);
-s32	Disc_IsGC(void);
-
-/* Headers for general usage */
-extern struct discHdr wii_hdr;
-extern struct gc_discHdr gc_hdr;
-
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif
 

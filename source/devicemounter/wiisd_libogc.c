@@ -45,6 +45,8 @@
 #include <ogc/machine/asm.h>
 #include <ogc/machine/processor.h>
 
+extern void gprintf(const char *format, ...);
+
 #define SDIO_HEAPSIZE				(5*1024)
 
 #define PAGE_SIZE512				512
@@ -360,12 +362,14 @@ static bool __sd0_initio()
 
 	__sdio_resetcard();
 	status = __sdio_getstatus();
-	
+	gprintf("SDIO: getstatus=0x%08x\n", status);
+
 	if(!(status & SDIO_STATUS_CARD_INSERTED))
-		return false;
+		{ gprintf("SDIO: card not inserted (status)\n"); return false; }
 
 	if(!(status & SDIO_STATUS_CARD_INITIALIZED))
 	{
+		gprintf("SDIO: card not initialized, doing manual init\n");
 		// IOS doesn't like this card, so we need to convice it to accept it.
 		// reopen the handle which makes IOS clean stuff up
 		IOS_Close(__sd0_fd);
@@ -486,20 +490,25 @@ bool sdio_OGC_Startup()
 {
 	if(__sdio_initialized==1) return true;
 
+	gprintf("SDIO: Startup\n");
 	if(rw_buffer == NULL) rw_buffer = MEM2_alloc(4*1024);
-	if(rw_buffer == NULL) return false;
+	if(rw_buffer == NULL) { gprintf("SDIO: MEM2_alloc failed\n"); return false; }
 
 	__sd0_fd = IOS_Open(_sd0_fs,1);
+	gprintf("SDIO: IOS_Open(%s) = %d\n", _sd0_fs, __sd0_fd);
 
 	if(__sd0_fd<0) {
+		gprintf("SDIO: IOS_Open failed\n");
 		sdio_OGC_Deinitialize();
 		return false;
 	}
 
 	if(__sd0_initio()==false) {
+		gprintf("SDIO: initio failed\n");
 		sdio_OGC_Deinitialize();
 		return false;
 	}
+	gprintf("SDIO: Startup OK\n");
 	__sdio_initialized = 1;
 	return true;
 }

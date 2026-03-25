@@ -1117,7 +1117,10 @@ void Nand::Init_ISFS()
 {
 	if(isfs_inited)
 		return;
-	PatchIOS(IOS_GetVersion() < 222, isWiiVC);// if normal IOS we patch isfs_permissions and es_identify, cIOS are already patched.
+	/* IOS patching skipped — Dolphin doesn't enforce these security checks,
+	   and scanning IOS memory (0x93400000-0x94000000) crashes in Dolphin
+	   because that region isn't mapped for PPC reads. */
+	// PatchIOS(IOS_GetVersion() < 222, isWiiVC);
 	usleep(1000);
 	//gprintf("Init ISFS\n");
 	ISFS_Initialize();

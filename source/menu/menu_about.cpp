@@ -175,26 +175,5 @@ void CMenu::_textAbout(void)
 		sites.toUTF8().c_str(),
 		thanks.toUTF8().c_str())
 	);
-	const char *IOS_Name = NULL;
-	switch(IOS_GetType(CurrentIOS.Version))
-	{
-		case IOS_TYPE_D2X:
-			IOS_Name = "D2X";
-			break;
-		case IOS_TYPE_WANIN:
-			IOS_Name = "Waninkoko";
-			break;
-		case IOS_TYPE_HERMES:
-		case IOS_TYPE_KWIIRK:
-			IOS_Name = "Hermes";
-			break;
-		default:
-			break;
-	}
-	if(IOS_Name == NULL)
-		m_btnMgr.setText(m_aboutLblIOS, wfmt(L"IOS%i v%i", CurrentIOS.Version, 
-			CurrentIOS.Revision), true);
-	else
-		m_btnMgr.setText(m_aboutLblIOS, wfmt(L"%s IOS%i[%i] v%d.%d", IOS_Name, CurrentIOS.Version,
-			CurrentIOS.Base, CurrentIOS.Revision, CurrentIOS.SubRevision), true);
+	m_btnMgr.setText(m_aboutLblIOS, L"Dolphin Consolizer", true);
 }

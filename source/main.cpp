@@ -4,36 +4,25 @@
 #include <sys/stat.h>
 
 #include "defines.h"
-#include "booter/external_booter.hpp"
 #include "channel/nand.hpp"
-#include "channel/nand_save.hpp"
 #include "devicemounter/DeviceHandler.hpp"
 #include "gecko/gecko.hpp"
 #include "gui/video.hpp"
 #include "gui/text.hpp"
-#include "homebrew/homebrew.h"
-#include "loader/alt_ios_gen.h"
-#include "loader/wdvd.h"
-#include "loader/alt_ios.h"
 #include "loader/sys.h"
-#include "loader/wbfs.h"
-#include "loader/cios.h"
-#include "loader/nk.h"
 #include "menu/menu.hpp"
 #include "memory/memory.h"
 
 bool isWiiVC = false;
-bool useMainIOS = true;
-bool sdOnly = false;
+bool sdOnly = true;
 volatile bool NANDemuView = false;
 volatile bool networkInit = false;
 
 int main(int argc, char **argv)
 {
-	MEM_init(); //Inits both mem1lo and mem2
-	mainIOS = DOL_MAIN_IOS;// 249
+	MEM_init();
 	__exception_setreload(10);
-	Gecko_Init(); //USB Gecko and SD/WiFi buffer
+	Gecko_Init();
 	#ifdef COMMITHASH
 		gprintf(" \nWelcome to %s %s %s!\nThis is the debug output.\n", APP_NAME, APP_VERSION, COMMITHASH);
 	#else
@@ -48,14 +37,7 @@ int main(int argc, char **argv)
 
 	for(u8 i = 0; i < argc; i++)
 	{
-		if(argv[i] != NULL && strcasestr(argv[i], "ios=") != NULL && strlen(argv[i]) > 4)
-		{
-			while(argv[i][0] && !isdigit(argv[i][0]))
-				argv[i]++;
-			if(atoi(argv[i]) < 254 && atoi(argv[i]) > 0)
-				mainIOS = atoi(argv[i]);
-		}
-		else if(strcasestr(argv[i], "waitdir=") != NULL)
+		if(strcasestr(argv[i], "waitdir=") != NULL)
 		{
 			char *ptr = strcasestr(argv[i], "waitdir=");
 			strncpy(wait_dir, ptr+strlen("waitdir="), sizeof(wait_dir) - 1);
@@ -74,105 +56,87 @@ int main(int argc, char **argv)
 				}
 			}
 		}
-			
 	}
+
 	/* Init video */
 	m_vid.init();
 
-	/* check if WiiVC */
-	WiiDRC_Init();
-	isWiiVC = WiiDRC_Inited();
-	
-	if(IsOnWiiU())
-	{
-		gprintf("WiiU\n");
-		if(isWiiVC)
-			gprintf("WiiVC\n");
-		else
-			gprintf("vWii Mode\n");
-	}
-	else 
-		gprintf("Real Wii\n");
-		
-	gprintf("AHBPROT disabled = %s\n", AHBPROT_Patched() ? "yes" : "no");
-	
 	/* Init device partition handlers */
 	DeviceHandle.Init();
-	
+
 	/* Init NAND handlers */
 	NandHandle.Init();
+	NandHandle.Init_ISFS();
 
-	if(isWiiVC)
-	{
-		NandHandle.Init_ISFS();
-		IOS_GetCurrentIOSInfo();
-		DeviceHandle.SetModes();
-	}
-	else
-	{
-		NandHandle.Init_ISFS();
-		
-		/* load and check wiiflow save for possible new IOS and Port settings */
-		if(InternalSave.CheckSave())
-			InternalSave.LoadSettings();
-			
-		/* Handle (c)IOS Loading */
-		if(useMainIOS && CustomIOS(IOS_GetType(mainIOS)))// load cios
-		{
-			NandHandle.DeInit_ISFS();
-			NandHandle.Patch_AHB();
-			IOS_ReloadIOS(mainIOS);
-			NandHandle.Init_ISFS();
-			gprintf("AHBPROT disabled after IOS Reload: %s\n", AHBPROT_Patched() ? "yes" : "no");
-			gprintf("Now using ");// gprintf finished in IOS_GetCurrentIOSInfo()
-		}
-		else
-			gprintf("Using IOS58\n");// stay on IOS58. no reload to cIOS
-		
-		IOS_GetCurrentIOSInfo();
-		if(CurrentIOS.Type == IOS_TYPE_HERMES)
-			load_ehc_module_ex();
-		else if(CurrentIOS.Type == IOS_TYPE_WANIN && CurrentIOS.Revision >= 18)
-			load_dip_249();
-		DeviceHandle.SetModes();
-		WDVD_Init();
-	}
-		
-	/* mount SD */
-	DeviceHandle.MountSD();// mount SD before calling isUsingUSB() duh!	
+	/* Mount SD */
+	bool sd_mounted = DeviceHandle.MountSD();
+	gprintf("SD mount: %s\n", sd_mounted ? "OK" : "FAILED");
+	gprintf("SD inserted: %s\n", DeviceHandle.IsInserted(SD) ? "YES" : "NO");
 
-	/* mount USB if needed */
-	DeviceHandle.SetMountUSB(!sdOnly && !isWiiVC);
-	bool usb_mounted = DeviceHandle.MountAllUSB();// only mounts any USB if !sdOnly
-	
-	/* init wait images and show wait animation */
-	if(strlen(gameid) == 0)// dont show if autobooting a wii game.
+	/* Init wait images and show wait animation */
+	if(strlen(gameid) == 0)
 	{
 		m_vid.setCustomWaitImgs(wait_dir, wait_loop);
 		m_vid.waitMessage(0.15f);
 	}
 
-	/* init controllers for input */
-	Open_Inputs();// WPAD_SetVRes() is called later in mainMenu.init() during cursor init which gets the theme pointer images
+	/* Init controllers for input */
+	Open_Inputs();
 
 	/* sys inits */
-	Sys_Init();// set reset and power button callbacks
-	
+	Sys_Init();
+
 	bool startup_successful = false;
-	/* init configs, folders, coverflow, gui and more */
-	if(mainMenu.init(usb_mounted))
+	/* Init configs, folders, coverflow, gui and more */
+	if(mainMenu.init())
 	{
 		startup_successful = true;
-		if(!isWiiVC)
-			writeStub();// copy return stub to memory
-		if(!isWiiVC && strlen(gameid) != 0)// if argv game ID then launch it
+		if(strlen(gameid) != 0)
 			mainMenu.directlaunch(gameid);
 		else
-			mainMenu.main();// start wiiflow with main menu displayed
+			mainMenu.main();
 	}
-	// at this point either wiiflow bootup failed or the user is exiting wiiflow
-	ShutdownBeforeExit();// unmount devices and close inputs
-	if(startup_successful)// use wiiflow's exit choice
+	else
+	{
+		/* init() failed — show error on a basic console, wait, then exit. */
+		gprintf("CMenu::init() failed\n");
+		gprintf("SD mounted: %s\n", sd_mounted ? "YES" : "NO");
+		gprintf("SD inserted: %s\n", DeviceHandle.IsInserted(SD) ? "YES" : "NO");
+
+		/* Cleanly shut down WiiFlow's GX video before re-initing console */
+		m_vid.cleanup();
+
+		/* Re-init basic console on framebuffer for error display */
+		VIDEO_Init();
+		GXRModeObj *rmode = VIDEO_GetPreferredMode(NULL);
+		void *xfb = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
+		VIDEO_Configure(rmode);
+		VIDEO_SetNextFramebuffer(xfb);
+		VIDEO_SetBlack(FALSE);
+		VIDEO_Flush();
+		VIDEO_WaitVSync();
+		if(rmode->viTVMode & VI_NON_INTERLACE)
+			VIDEO_WaitVSync();
+		CON_Init(xfb, 20, 20, rmode->fbWidth, rmode->xfbHeight,
+		         rmode->fbWidth * VI_DISPLAY_PIX_SZ);
+
+		printf("\n\n");
+		printf("  *** WiiFlow Init Failed ***\n\n");
+		printf("  SD card config not found.\n");
+		printf("  WiiFlow needs sd:/apps/wiiflow/ with\n");
+		printf("  config files and theme data.\n\n");
+		printf("  SD mounted: %s\n", sd_mounted ? "YES" : "NO");
+		printf("  SD inserted: %s\n", DeviceHandle.IsInserted(SD) ? "YES" : "NO");
+		printf("\n  Halted. Close Dolphin to exit.\n");
+
+		for(;;)
+			VIDEO_WaitVSync();
+	}
+
+	/* Shutdown */
+	Close_Inputs();
+	DeviceHandle.UnMountAll();
+	if(startup_successful)
 		Sys_Exit();
-	return 0;// otherwise just exit to loader (system menu or hbc).
+	return 0;
 }

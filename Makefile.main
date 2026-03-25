@@ -17,19 +17,15 @@ include $(DEVKITPPC)/wii_rules
 TARGET		:=	boot
 BUILD		:=	build
 SOURCES		:=	source \
-				source/booter \
 				source/banner \
 				source/channel \
-				source/cheats \
 				source/config \
 				source/devicemounter \
+				source/consolizer \
 				source/fileOps \
-				source/gc \
 				source/gecko \
 				source/gui \
 				source/hw \
-				source/homebrew \
-				source/libwbfs \
 				source/list \
 				source/loader \
 				source/memory \
@@ -72,7 +68,7 @@ endif
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBS	:=	-lwolfssl -lcustomfat -lcustomntfs -lcustomext2fs -lpng -lturbojpeg -lm -lz -lwiiuse -lbte -lwupc -lwiidrc -lsicksaxis -lasnd -lmad -lvorbisidec -logg -lfreetype -lbz2 -logc
+LIBS	:=	-lwolfssl -lcustomfat -lpng -lturbojpeg -lm -lz -lwiiuse -lbte -lwupc -lwiidrc -lsicksaxis -lasnd -lmad -lvorbisidec -logg -lfreetype -lbz2 -logc
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
@@ -153,10 +149,7 @@ all:
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(OUTPUT).elf $(OUTPUT).dol \
-		$(CURDIR)/source/loader/alt_ios_gen.h \
-		$(CURDIR)/out/bins/ext_booter.bin \
-		$(CURDIR)/out/bins/app_booter.bin
+	@rm -fr $(BUILD) $(OUTPUT).elf $(OUTPUT).dol
 
 #---------------------------------------------------------------------------------
 else

@@ -1,18 +1,13 @@
+/* Stub — not used in Dolphin Consolizer build */
 #ifndef _ALT_IOS_H_
 #define _ALT_IOS_H_
 
-#include <ogcsys.h>
+#include <gctypes.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+extern u8 mainIOS;
+extern bool useMainIOS;
+extern int currentPort;
 
-bool loadIOS(int ios, bool MountDevices);
-void load_ehc_module_ex(void);
-void load_dip_249();
+static inline void loadIOS(int ios, bool temp) { (void)ios; (void)temp; }
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+#endif /* _ALT_IOS_H_ */

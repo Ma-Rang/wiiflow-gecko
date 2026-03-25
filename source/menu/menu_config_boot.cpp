@@ -1,6 +1,7 @@
 
 #include "menu.hpp"
 #include "channel/nand_save.hpp"
+#include "loader/alt_ios.h"
 
 TexData m_bootBg;
 

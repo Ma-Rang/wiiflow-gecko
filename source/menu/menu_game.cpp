@@ -1,8 +1,11 @@
 
 #include "menu.hpp"
 #include "banner/BannerWindow.hpp"
+#include "channel/channels.h"
+#include "consolizer/consolizer.hpp"
 #include "gc/gcdisc.hpp"
 #include "gui/WiiMovie.hpp"
+#include "loader/wbfs.h"
 
 //sounds
 extern const u8 gc_ogg[];
@@ -412,32 +415,7 @@ void CMenu::_game(bool launch)
 			}
 			else if(m_btnMgr.selected(m_gameBtnSettings))
 			{
-				_hideGame();
-				if(m_locked)
-				{
-					m_banner.SetShowBanner(false);
-					_error(_t("errgame15", L"WiiFlow locked! Unlock WiiFlow to use this feature."));
-					m_banner.SetShowBanner(true);
-				}
-				else
-				{
-					// the mainloop handles drawing banner while in settings
-					m_banner.ToggleZoom();//zoom to full
-					m_banner.ToggleGameSettings();// dim brightness
-					if(hdr->type == TYPE_GC_GAME)
-						_configGCGame(hdr);
-					else
-						_configGame(hdr);
-					m_banner.ToggleGameSettings();//reset brightness
-					m_banner.ToggleZoom();//de zoom to small
-					/*if(m_newGame)
-					{
-						m_newGame = false;
-						startGameSound = 1;
-						_playGameSound();
-					}*/
-				}
-				_showGame();
+				/* Per-game settings removed — Consolizer manages game config */
 			}
 			else if(m_btnMgr.selected(m_gameBtnFavoriteOn) || m_btnMgr.selected(m_gameBtnFavoriteOff))
 			{
@@ -632,22 +610,6 @@ void CMenu::_game(bool launch)
 				{
 					m_btnMgr.show(m_gameBtnPlay);
 					m_btnMgr.show(m_gameBtnBack);
-					m_btnMgr.show(m_gameBtnSettings);
-					m_btnMgr.show(m_gameBtnDelete);
-					m_btnMgr.show(m_gameBtnCategories);
-					bool b;
-					if(hdr->type == TYPE_PLUGIN)
-					{
-						b = m_gcfg1.getBool("FAVORITES_PLUGINS", gcfg1Key, false);
-						if(!b) m_gcfg1.remove("FAVORITES_PLUGINS", gcfg1Key);
-					}
-					else
-					{
-						b = m_gcfg1.getBool("FAVORITES", gcfg1Key, false);
-						if(!b) m_gcfg1.remove("FAVORITES", gcfg1Key);
-					}
-					m_btnMgr.show(b ? m_gameBtnFavoriteOn : m_gameBtnFavoriteOff);
-					m_btnMgr.hide(b ? m_gameBtnFavoriteOff : m_gameBtnFavoriteOn);
 					for(u8 i = 0; i < ARRAY_SIZE(m_gameLblUser); ++i)
 						if(m_gameLblUser[i] != -1)
 							m_btnMgr.show(m_gameLblUser[i]);
@@ -1084,6 +1046,29 @@ void * CMenu::_gameSoundThread(void *obj)
 				}
 			}
 		}
+	}
+	/* Consolizer game: no local disc, request sound.bin over USB Gecko instead */
+	if(GameHdr->path[0] == '\0' && custom_bnr_file == NULL && GameHdr->type == TYPE_WII_GAME)
+	{
+		u8 *sndBuf = NULL;
+		u32 sndSize = Consolizer_RequestSound(GameHdr->settings[0], &sndBuf);
+		if(sndBuf != NULL && sndSize > 0)
+		{
+			if(sndSize >= sizeof(IMD5Header) && memcmp(&((IMD5Header *)sndBuf)->fcc, "IMD5", 4) == 0)
+			{
+				u32 newSize = 0;
+				u8 *newSound = DecompressCopy(sndBuf, sndSize, &newSize);
+				free(sndBuf);
+				if(newSound != NULL && newSize > 0)
+					m->m_gameSound.Load(newSound, newSize);
+			}
+			else
+				m->m_gameSound.Load(sndBuf, sndSize);
+			if(m->m_gameSound.IsLoaded())
+				m->m_gamesound_changed = true;
+		}
+		m->m_soundThrdBusy = false;
+		return NULL;
 	}
 	if(GameHdr->type == TYPE_GC_GAME && custom_bnr_file == NULL)
 	{

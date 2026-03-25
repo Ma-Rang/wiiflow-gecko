@@ -6,6 +6,7 @@
 #include "menu.hpp"
 #include "types.h"
 #include "lockMutex.hpp"
+#include "gecko/wifi_gecko.hpp"
 #include "channel/nand.hpp"
 #include "devicemounter/usbstorage.h"
 #include "gui/GameTDB.hpp"
@@ -1663,17 +1664,8 @@ int CMenu::_bannerDownloader()
 
 	if(dl_gameID.empty())
 	{
-		currentPartition = m_cfg.getInt(GC_DOMAIN, "partition", USB1);
-		string gameDir(fmt(gc_games_dir, DeviceName[currentPartition]));
-		string cacheDir(fmt("%s/%s_gamecube.db", m_listCacheDir.c_str(), DeviceName[currentPartition]));
-		m_cacheList.CreateList(COVERFLOW_GAMECUBE, gameDir, stringToVector(".iso|.ciso|root", '|'), cacheDir, false);
-
-		for(u32 i = 0; i < m_cacheList.size(); ++i)
-		{
-			if(!fsop_FileExist(fmt("%s/%s.bnr", m_customBnrDir.c_str(), m_cacheList[i].id)))
-				BnrIDList.push_back(m_cacheList[i].id);
-		}
-		m_cacheList.clear();
+		/* Dolphin Consolizer: no local GC game scanning */
+		(void)0;
 	}
 	else
 		BnrIDList.push_back(dl_gameID);

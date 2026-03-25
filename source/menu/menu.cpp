@@ -12,20 +12,12 @@
 #include "fonts.h"
 #include "banner/BannerWindow.hpp"
 #include "channel/nand.hpp"
-#include "channel/nand_save.hpp"
-#include "gc/gc.hpp"
 #include "hw/Gekko.h"
 #include "gui/WiiMovie.hpp"
-#include "loader/alt_ios.h"
-#include "loader/cios.h"
-#include "loader/fs.h"
-#include "loader/nk.h"
-#include "loader/playlog.h"
-#include "loader/wbfs.h"
 #include "music/SoundHandler.hpp"
-#include "network/gcard.h"
 #include "unzip/U8Archive.h"
-#include "network/proxysettings.h"
+#include "gecko/wifi_gecko.hpp"
+#include "loader/fs.h"
 
 // Sounds
 extern const u8 click_wav[];
@@ -71,7 +63,6 @@ CMenu::CMenu()
 	m_lqBg = NULL;
 	m_use_sd_logging = false;
 	m_use_wifi_gecko = false;
-	//m_init_network = false;
 	m_use_source = true;
 	m_sourceflow = false;
 	m_clearCats = false;
@@ -101,24 +92,18 @@ CMenu::CMenu()
 	m_source_autoboot = false;
 }
 
-bool CMenu::init(bool usb_mounted)
+bool CMenu::init()
 {
-	/* Clear Playlog to prevent wiiflow from being added to it */
-	Playlog_Delete();
-
-	/* Find the first partition with apps/wiiflow folder */
+	/* Find the SD partition with apps/wiiflow folder */
 	const char *drive = NULL;
 	struct stat dummy;
-	for(int i = SD; i <= USB8; i++)
-	{
-		if(DeviceHandle.IsInserted(i) && DeviceHandle.GetFSType(i) != PART_FS_WBFS && stat(fmt("%s:/%s", DeviceName[i], APPS_DIR), &dummy) == 0)
-		{
-			drive = DeviceName[i];
-			break;
-		}
-	}
-	if(drive == NULL) // Could not find apps/wiiflow so we can't go on
+	if(DeviceHandle.IsInserted(SD) && stat(fmt("%s:/%s", DeviceName[SD], APPS_DIR), &dummy) == 0)
+		drive = DeviceName[SD];
+	if(drive == NULL)
 		return false;
+
+	/* Initialize Consolizer USB Gecko link */
+	Consolizer_Init();
 
 	m_appDir = fmt("%s:/%s", drive, APPS_DIR);
 	gprintf("Wiiflow boot.dol Location: %s\n", m_appDir.c_str());
@@ -148,112 +133,7 @@ bool CMenu::init(bool usb_mounted)
 	LogToSD_SetBuffer(m_use_sd_logging);
 	/* ------------------------------------------------------*/
 	
-	/* Init gamer tags now in case we need to init network on boot */
-	m_cfg.setString("GAMERCARD", "gamercards", "wiinnertag");
-	m_cfg.getString("GAMERCARD", "wiinnertag_url", WIINNERTAG_URL);
-	m_cfg.getString("GAMERCARD", "wiinnertag_key", "");
-	if(m_cfg.getBool("GAMERCARD", "gamercards_enable", false))
-	{
-		vector<string> gamercards = stringToVector(m_cfg.getString("GAMERCARD", "gamercards"), '|');
-		if (gamercards.size() == 0)
-		{
-			gamercards.push_back("wiinnertag");
-		}
-
-		for (vector<string>::iterator itr = gamercards.begin(); itr != gamercards.end(); itr++)
-		{
-			gprintf("Found gamercard provider: %s\n",(*itr).c_str());
-			register_card_provider(
-				m_cfg.getString("GAMERCARD", fmt("%s_url", (*itr).c_str())).c_str(),
-				m_cfg.getString("GAMERCARD", fmt("%s_key", (*itr).c_str())).c_str()
-			);
-		}
-	}
-	/* Init Network if wanted for gamercard if it isn't already inited */
-	if(has_enabled_providers())
-		_initAsyncNetwork();
-
-	/* Set the proxy settings */
-	proxyUseSystem = m_cfg.getBool("PROXY", "proxy_use_system", true);
-	memset(proxyAddress, 0, sizeof(proxyAddress));
-	strncpy(proxyAddress, m_cfg.getString("PROXY", "proxy_address", "").c_str(), sizeof(proxyAddress) - 1);
-	proxyPort = m_cfg.getInt("PROXY", "proxy_port", 0);
-	memset(proxyUsername, 0, sizeof(proxyUsername));
-	strncpy(proxyUsername, m_cfg.getString("PROXY", "proxy_username", "").c_str(), sizeof(proxyUsername) - 1);
-	memset(proxyPassword, 0, sizeof(proxyPassword));
-	strncpy(proxyPassword, m_cfg.getString("PROXY", "proxy_password", "").c_str(), sizeof(proxyPassword) - 1);
-	getProxyInfo();
-	
-	/* set default homebrew partition for first boot */
-	m_cfg.getInt(HOMEBREW_DOMAIN, "partition", strcmp(drive, "sd") == 0 ? 0 : 1);// drive is device where wiiflow is.
-	
-	/* Set SD only to off if any usb device is attached */
-	bool cfg_sdonly = m_cfg.getBool("GENERAL", "sd_only", usb_mounted ? false : true);// will only set it if this doesn't already exist - very first boot up
-	if(cfg_sdonly != sdOnly)// done for backwards compatibility with older wiiflow lite's
-		InternalSave.SaveSDOnly(cfg_sdonly);
-
-	/* set default wii games partition in case this is the first boot */
-	int wp = m_cfg.getInt(WII_DOMAIN, "partition", -1);
-	if(wp < 0)
-	{
-		if(!m_cfg.getBool("GENERAL", "sd_only"))
-		{
-			for(int i = SD; i <= USB8; i++) // Find first wbfs folder or a partition of wbfs file system
-			{
-				if(DeviceHandle.IsInserted(i) && (DeviceHandle.GetFSType(i) == PART_FS_WBFS || stat(fmt(GAMES_DIR, DeviceName[i]), &dummy) == 0))
-				{
-					wp = i;
-					break;
-				}
-			}
-		}
-		if(wp < 0)// not found 
-		{
-			if(DeviceHandle.IsInserted(SD))// set to sd if inserted otherwise USB1
-				wp = 0;
-			else
-				wp = 1;
-		}
-		m_cfg.setInt(WII_DOMAIN, "partition", wp);
-	}
-	
-	/* preferred partition setting - negative 1 means not set by user so skip this */
-	int pp = m_cfg.getInt(WII_DOMAIN, "preferred_partition", -1);
-	if(pp >= 0)
-	{
-		if(usb_mounted && pp > 0)
-			m_cfg.setInt(WII_DOMAIN, "partition", pp);
-		else
-			m_cfg.setInt(WII_DOMAIN, "partition", SD);
-	}
-	pp = m_cfg.getInt(GC_DOMAIN, "preferred_partition", -1);
-	if(pp >= 0)
-	{
-		if(usb_mounted && pp > 0)
-			m_cfg.setInt(GC_DOMAIN, "partition", USB1);
-		else
-			m_cfg.setInt(GC_DOMAIN, "partition", SD);
-	}
-	
-	/* Our Wii games dir */
-	u8 partition = m_cfg.getInt(WII_DOMAIN, "partition");
-	gprintf("Setting Wii games partition to: %i\n", partition);
-	
-	memset(wii_games_dir, 0, 64);
-	strncpy(wii_games_dir, m_cfg.getString(WII_DOMAIN, "wii_games_dir", GAMES_DIR).c_str(), 63);
-	if(strncmp(wii_games_dir, "%s:/", 4) != 0)
-		strcpy(wii_games_dir, GAMES_DIR);
-	gprintf("Wii Games Directory: %s\n", wii_games_dir);
-	
-	/* GameCube stuff */
-	memset(gc_games_dir, 0, 64);
-	strncpy(gc_games_dir, m_cfg.getString(GC_DOMAIN, "gc_games_dir", DF_GC_GAMES_DIR).c_str(), 63);
-	if(strncmp(gc_games_dir, "%s:/", 4) != 0)
-		strcpy(gc_games_dir, DF_GC_GAMES_DIR);
-	gprintf("GameCube Games Directory: %s\n", gc_games_dir);
-
-	m_devo_installed = DEVO_Installed(m_dataDir.c_str());
-	m_nintendont_installed = Nintendont_Installed();
+	/* GC banner sound settings */
 	m_gc_play_banner_sound = m_cfg.getBool(GC_DOMAIN, "play_banner_sound", true);
 	m_gc_play_default_sound = m_cfg.getBool(GC_DOMAIN, "play_default_sound", true);
 	
@@ -320,25 +200,6 @@ bool CMenu::init(bool usb_mounted)
 	fsop_MakeFolder(m_cartDir.c_str());
 	fsop_MakeFolder(m_snapDir.c_str());
 	
-	if(!isWiiVC)
-	{
-		/* Emu nands init even if not being used */
-		memset(emu_nands_dir, 0, sizeof(emu_nands_dir));
-		bool vwiinands = IsOnWiiU() && m_cfg.getBool(CHANNEL_DOMAIN, "use_vwiinands", true);
-		strncpy(emu_nands_dir, vwiinands ? "vwiinands" : "nands", sizeof(emu_nands_dir) - 1);
-		
-		int dev = DeviceHandle.PartitionUsableForNandEmu(SD) ? 0 : 1;
-		string emuNand = m_cfg.getString(CHANNEL_DOMAIN, "current_emunand", "default");// just to set to default on first boot
-		int emuPart = m_cfg.getInt(CHANNEL_DOMAIN, "partition", dev);
-		string savesNand = m_cfg.getString(WII_DOMAIN, "current_save_emunand", "default");
-		int savesPart = m_cfg.getInt(WII_DOMAIN, "savepartition", dev);
-
-		gprintf("emunand = %s:/%s/%s\n", DeviceName[emuPart], emu_nands_dir, emuNand.c_str());
-		gprintf("savesnand = %s:/%s/%s\n", DeviceName[savesPart],  emu_nands_dir, savesNand.c_str());
-		m_cfg.getInt(CHANNEL_DOMAIN, "emulation", 0);// partial by default
-		m_cfg.getInt(WII_DOMAIN, "save_emulation", 0);// off by default
-	}
-	
 	/* misc. setup */
 	SoundHandle.Init();
 	m_gameSound.SetVoice(1);
@@ -352,43 +213,13 @@ bool CMenu::init(bool usb_mounted)
 	/* Check if wiiflow is parental locked */
 	m_locked = m_cfg.getString("GENERAL", "parent_code", "").size() >= 4;
 	
-	/* Switch WFLA to DWFA in case they were using old wiiflow lite */
-	if(m_cfg.getString("GENERAL", "returnto") == "WFLA")
-		m_cfg.setString("GENERAL", "returnto", "DWFA");
-
-	/* set WIIFLOW_DEF exit to option */
-	/* 0 thru 2 of exit to enum (EXIT_TO_MENU, EXIT_TO_HBC, EXIT_TO_WIIU) in sys.h */
-	int exit_to = min(max(0, m_cfg.getInt("GENERAL", "exit_to", 0)), (int)ARRAY_SIZE(CMenu::_exitTo) - 1);
-	Sys_ExitTo(exit_to);
+	/* Exit always goes to System Menu */
+	Sys_ExitTo(EXIT_TO_MENU);
 
 	/* load misc config files */
 	m_cat.load(fmt("%s/" CAT_FILENAME, m_settingsDir.c_str()));
 	m_gcfg1.load(fmt("%s/" GAME_SETTINGS1_FILENAME, m_settingsDir.c_str()));
 	m_platform.load(fmt("%s/platform.ini", m_pluginDataDir.c_str()));
-	
-	/* Init plugins */
-	m_plugin.init(m_pluginsDir);
-	vector<string> magics = m_cfg.getStrings(PLUGIN_DOMAIN, "enabled_plugins", ',');
-	if(magics.size() > 0)
-	{
-		enabledPluginsCount = 0;
-		string enabledMagics;
-		for(u8 i = 0; i < magics.size(); i++)
-		{
-			u8 pos = m_plugin.GetPluginPosition(strtoul(magics[i].c_str(), NULL, 16));
-			if(pos < 255)
-			{
-				enabledPluginsCount++;
-				m_plugin.SetEnablePlugin(pos, 2);
-				if(enabledPluginsCount == 1)
-					enabledMagics = magics[i];
-				else
-					enabledMagics.append(',' + magics[i]);
-			}
-		}
-		m_cfg.setString(PLUGIN_DOMAIN, "enabled_plugins", enabledMagics);
-		magics.clear();
-	}
 	
 	/* Set wiiflow language */
 	const char *defLang = "Default";
@@ -437,8 +268,7 @@ bool CMenu::init(bool usb_mounted)
 	}
 
 	/* Init gametdb and custom titles for game list making */
-	m_cacheList.Init(m_settingsDir.c_str(), m_loc.getString(m_curLanguage, "gametdb_code", "EN").c_str(), m_pluginDataDir.c_str(),
-			 m_cfg.getString(CONFIG_FILENAME_SKIP_DOMAIN, CONFIG_FILENAME_SKIP_KEY, CONFIG_FILENAME_SKIP_DEFAULT));
+	m_cacheList.Init(m_settingsDir.c_str(), m_loc.getString(m_curLanguage, "gametdb_code", "EN").c_str());
 
 	/* Coverflow init */
 	CoverFlow.init(m_base_font, m_base_font_size, m_vid.vid_50hz());
@@ -2036,7 +1866,13 @@ void CMenu::_initCF(void)
 				CoverFlow.addItem(&(*hdr), 0, 0);// no filtering for sourceflow
 			continue;
 		}
-		
+
+		/* Filter by current view — only show games matching the selected type */
+		if(m_current_view == COVERFLOW_WII && hdr->type != TYPE_WII_GAME)
+			continue;
+		if(m_current_view == COVERFLOW_GAMECUBE && hdr->type != TYPE_GC_GAME)
+			continue;
+
 		string favDomain = "FAVORITES";
 		string adultDomain = "ADULTONLY";
 		string playcntDomain = "PLAYCOUNT";
@@ -2390,279 +2226,22 @@ void CMenu::_initCF(void)
 
 bool CMenu::_loadList(void)
 {
-	CoverFlow.clear();// clears filtered list (m_items), cover list (m_covers), and cover textures and stops coverloader
+	CoverFlow.clear();
 	m_gameList.clear();
 	vector<dir_discHdr>().swap(m_gameList);
-	NANDemuView = false;
-	
-	if(m_sourceflow)
-	{
-		m_cacheList.createSFList(m_max_source_btn, m_source, m_sourceDir);
-		for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-			m_gameList.push_back(*tmp_itr);
-		m_cacheList.Clear();
-		if(SF_cacheCovers)
-		{
-			SF_cacheCovers = false;
-			cacheCovers = true;
-		}
-		return true;
-	}
-	gprintf("Creating Gamelist\n");
-	if(m_current_view & COVERFLOW_PLUGIN)
-		_loadPluginList();
-		
-	if(m_current_view & COVERFLOW_WII)
-		_loadWiiList();
 
-	if(m_current_view & COVERFLOW_CHANNEL)
-		_loadChannelList();
-
-	if(m_current_view & COVERFLOW_GAMECUBE)
-		_loadGamecubeList();
-
-	if(m_current_view & COVERFLOW_HOMEBREW)
-		_loadHomebrewList(HOMEBREW_DIR);
-
+	gprintf("Requesting game list from Consolizer\n");
+	m_cacheList.CreateListFromConsolizer();
+	for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
+		m_gameList.push_back(*tmp_itr);
 	m_cacheList.Clear();
 
 	gprintf("Games found: %i\n", m_gameList.size());
-	return m_gameList.size() > 0 ? true : false;
+	return m_gameList.size() > 0;
 }
 
-bool CMenu::_loadWiiList(void)
-{
-	gprintf("Adding wii list\n");
-	
-	bool updateCache = m_cfg.getBool(WII_DOMAIN, "update_cache");
-	if(updateCache)
-		cacheCovers = true;
-	m_cfg.remove(WII_DOMAIN, "update_cache");
-	for(u8 i = 0; i < 2; ++i)
-	{
-		currentPartition = m_cfg.getInt(WII_DOMAIN, "partition", USB1);
-		if(currentPartition == 8)
-			currentPartition = i;
-		else if(i == 1)
-			continue;
-			
-		if(!DeviceHandle.IsInserted(currentPartition))
-			continue;
 
-		DeviceHandle.OpenWBFS(currentPartition);
-		string gameDir(fmt(wii_games_dir, DeviceName[currentPartition]));
-		string cacheDir(fmt("%s/%s_wii.db", m_listCacheDir.c_str(), DeviceName[currentPartition]));
-		bool preCachedList = fsop_FileExist(cacheDir.c_str());
-		m_cacheList.CreateList(COVERFLOW_WII, gameDir, stringToVector(".wbfs|.iso", '|'), cacheDir, updateCache);
-		WBFS_Close();
-		for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-			m_gameList.push_back(*tmp_itr);
-		if(!preCachedList && fsop_FileExist(cacheDir.c_str()))
-			cacheCovers = true;
-	}
-	return true;
-}
 
-bool CMenu::_loadHomebrewList(const char *HB_Dir)
-{
-	currentPartition = m_cfg.getInt(HOMEBREW_DOMAIN, "partition", SD);
-	if(!DeviceHandle.IsInserted(currentPartition))
-		return false;
-
-	gprintf("Adding homebrew list\n");
-	string gameDir(fmt("%s:/%s", DeviceName[currentPartition], HB_Dir));
-	string cacheDir(fmt("%s/%s_%s.db", m_listCacheDir.c_str(), DeviceName[currentPartition], HB_Dir));
-	bool updateCache = m_cfg.getBool(HOMEBREW_DOMAIN, "update_cache");
-	bool preCachedList = fsop_FileExist(cacheDir.c_str());
-	m_cacheList.CreateList(COVERFLOW_HOMEBREW, gameDir, stringToVector(".dol|.elf", '|'), cacheDir, updateCache);
-	m_cfg.remove(HOMEBREW_DOMAIN, "update_cache");
-	for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-		m_gameList.push_back(*tmp_itr);
-	if(updateCache || (!preCachedList && fsop_FileExist(cacheDir.c_str())))
-		cacheCovers = true;
-	return true;
-}
-
-bool CMenu::_loadGamecubeList()
-{
-	gprintf("Adding gamecube list\n");
-
-	bool updateCache = m_cfg.getBool(GC_DOMAIN, "update_cache");
-	if(updateCache)
-		cacheCovers = true;
-	m_cfg.remove(GC_DOMAIN, "update_cache");
-	for(u8 i = 0; i < 2; ++i)
-	{
-		currentPartition = m_cfg.getInt(GC_DOMAIN, "partition", USB1);
-		if(currentPartition == 8)
-			currentPartition = i;
-		else if(i == 1)
-			continue;
-			
-		if(!DeviceHandle.IsInserted(currentPartition))
-			continue;
-
-		string gameDir(fmt(gc_games_dir, DeviceName[currentPartition]));
-		string cacheDir(fmt("%s/%s_gamecube.db", m_listCacheDir.c_str(), DeviceName[currentPartition]));
-		bool preCachedList = fsop_FileExist(cacheDir.c_str());
-		m_cacheList.CreateList(COVERFLOW_GAMECUBE, gameDir, stringToVector(".iso|.gcm|.ciso|root", '|'), cacheDir, updateCache);
-		for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-		{
-			if(tmp_itr->settings[0] == 1) /* disc 2 */
-				continue;// skip gc disc 2 if its still part of the cached list
-			m_gameList.push_back(*tmp_itr);
-		}
-		if(!preCachedList && fsop_FileExist(cacheDir.c_str()))
-			cacheCovers = true;
-	}
-	return true;
-}
-
-bool CMenu::_loadChannelList(void)
-{
-	u8 chantypes = m_cfg.getUInt(CHANNEL_DOMAIN, "channels_type", CHANNELS_REAL);
-	if(chantypes < CHANNELS_REAL || chantypes > CHANNELS_BOTH)
-	{
-		m_cfg.setUInt(CHANNEL_DOMAIN, "channels_type", CHANNELS_REAL);
-		chantypes = CHANNELS_REAL;
-	}
-	bool updateCache = m_cfg.getBool(CHANNEL_DOMAIN, "update_cache");
-	m_cfg.remove(CHANNEL_DOMAIN, "update_cache");
-	vector<string> NullVector;
-	if(chantypes & CHANNELS_REAL)
-	{
-		gprintf("Adding real nand list\n");
-		NANDemuView = false;
-		if(updateCache)
-			cacheCovers = true;// real nand channels list is not cached but covers may still need to be updated
-		m_cacheList.CreateList(COVERFLOW_CHANNEL, std::string(), NullVector, std::string(), false);
-		for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-			m_gameList.push_back(*tmp_itr);
-	}
-	if(chantypes & CHANNELS_EMU)
-	{
-		NANDemuView = true;
-		int emuPartition = _FindEmuPart(EMU_NAND, false);// check if emunand folder exist and on FAT
-		if(emuPartition >= 0)
-		{
-			gprintf("Adding emu nand list\n");
-			currentPartition = emuPartition;
-			string cacheDir = fmt("%s/%s_channels.db", m_listCacheDir.c_str(), DeviceName[currentPartition]);
-			bool preCachedList = fsop_FileExist(cacheDir.c_str());
-			m_cacheList.CreateList(COVERFLOW_CHANNEL, std::string(), NullVector, cacheDir, updateCache);
-			for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-				m_gameList.push_back(*tmp_itr);
-			if(updateCache || (!preCachedList && fsop_FileExist(cacheDir.c_str())))
-				cacheCovers = true;
-		}
-	}
-	return true;
-}
-
-bool CMenu::_loadPluginList()
-{
-	bool updateCache = m_cfg.getBool(PLUGIN_DOMAIN, "update_cache");
-	gprintf("Adding plugins list\n");
-	bool channels_done = false;
-	for(u8 i = 0; m_plugin.PluginExist(i); ++i)
-	{
-		if(!m_plugin.GetEnabledStatus(i))
-			continue;
-		int romsPartition = m_plugin.GetRomPartition(i);
-		if(romsPartition < 0)
-			romsPartition = m_cfg.getInt(PLUGIN_DOMAIN, "partition", 0);
-		currentPartition = romsPartition;
-		if(!DeviceHandle.IsInserted(currentPartition))
-			continue;
-		strncpy(m_plugin.PluginMagicWord, fmt("%08x", m_plugin.GetPluginMagic(i)), 8);
-		const char *romDir = m_plugin.GetRomDir(i);
-		if(strstr(romDir, "scummvm.ini") == NULL)
-		{
-			if(strncasecmp(m_plugin.PluginMagicWord, HB_PMAGIC, 6) == 0)//HBRW
-			{
-				if(updateCache)
-					m_cfg.setBool(HOMEBREW_DOMAIN, "update_cache", true);
-				_loadHomebrewList(romDir);
-			}
-			else if(strncasecmp(m_plugin.PluginMagicWord, GC_PMAGIC, 8) == 0)//NGCM
-			{
-				if(updateCache)
-					m_cfg.setBool(GC_DOMAIN, "update_cache", true);
-				_loadGamecubeList();
-			}
-			else if(strncasecmp(m_plugin.PluginMagicWord, WII_PMAGIC, 8) == 0)//NWII
-			{
-				if(updateCache)
-					m_cfg.setBool(WII_DOMAIN, "update_cache", true);
-				_loadWiiList();
-			}
-			else if(!channels_done && (strncasecmp(m_plugin.PluginMagicWord, NAND_PMAGIC, 8) == 0 || strncasecmp(m_plugin.PluginMagicWord, ENAND_PMAGIC, 8) == 0))//NAND
-			{
-				channels_done = true;
-				if(updateCache)
-					m_cfg.setBool(CHANNEL_DOMAIN, "update_cache", true);
-				_loadChannelList();
-			}
-			else
-			{
-				string cachedListFile(fmt("%s/%s_%s.db", m_listCacheDir.c_str(), DeviceName[currentPartition], m_plugin.PluginMagicWord));
-				bool preCachedList = fsop_FileExist(cachedListFile.c_str());
-				
-				string romsDir(fmt("%s:/%s", DeviceName[currentPartition], romDir));
-				vector<string> FileTypes = stringToVector(m_plugin.GetFileTypes(i), '|');
-				m_cacheList.Color = m_plugin.GetCaseColor(i);
-				m_cacheList.Magic = m_plugin.GetPluginMagic(i);
-				m_cacheList.usePluginDBTitles = m_cfg.getBool(PLUGIN_DOMAIN, "database_titles", true);
-				
-				string platformName = m_platform.getString("PLUGINS", m_plugin.PluginMagicWord, "");
-				if(!platformName.empty())
-				{
-					/* check COMBINED for platform names that mean the same system just different region */
-					/* some platforms have different names per country (ex. Genesis/Megadrive) */
-					/* but we use only one platform name for both */
-					string newName = m_platform.getString("COMBINED", platformName, "");
-					if(newName.empty())
-						m_platform.remove("COMBINED", platformName);
-					else
-						platformName = newName;
-				}
-				
-				m_cacheList.CreateRomList(platformName.c_str(), romsDir, FileTypes, cachedListFile, updateCache);
-				
-				for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-					m_gameList.push_back(*tmp_itr);
-				if(updateCache || (!preCachedList && fsop_FileExist(cachedListFile.c_str())))
-					cacheCovers = true;
-			}
-		}
-		else
-		{
-			string cachedListFile(fmt("%s/%s_%s.db", m_listCacheDir.c_str(), DeviceName[currentPartition], m_plugin.PluginMagicWord));
-			bool preCachedList = fsop_FileExist(cachedListFile.c_str());
-			
-			Config scummvm;
-			if(strchr(romDir, ':') == NULL || !fsop_FileExist(romDir))
-				scummvm.load(fmt("%s/%s", m_pluginsDir.c_str(), romDir));
-			else
-				scummvm.load(romDir);
-			// should add error msg if loading scummvm fails or is not found
-			string platformName = "";
-			if(m_platform.loaded())/* convert plugin magic to platform name */
-				platformName = m_platform.getString("PLUGINS", m_plugin.PluginMagicWord);
-			m_cacheList.Color = m_plugin.GetCaseColor(i);
-			m_cacheList.Magic = m_plugin.GetPluginMagic(i);
-			m_cacheList.usePluginDBTitles = m_cfg.getBool(PLUGIN_DOMAIN, "database_titles", true);
-			m_cacheList.ParseScummvmINI(scummvm, DeviceName[currentPartition], m_pluginDataDir.c_str(), platformName.c_str(), cachedListFile, updateCache);
-			for(vector<dir_discHdr>::iterator tmp_itr = m_cacheList.begin(); tmp_itr != m_cacheList.end(); tmp_itr++)
-				m_gameList.push_back(*tmp_itr);
-			if(updateCache || (!preCachedList && fsop_FileExist(cachedListFile.c_str())))
-				cacheCovers = true;
-			scummvm.unload();
-		}
-	}
-	m_cfg.remove(PLUGIN_DOMAIN, "update_cache");
-	return true;
-}
 
 void CMenu::_stopSounds(void)
 {
@@ -2684,32 +2263,10 @@ void CMenu::_stopSounds(void)
 	m_gameSound.Stop();
 }
 
-/* wiiflow creates a map<u8 slot, u8 base > _installed_cios list for slots 200 to 253 and slot 0
-the first u8 is the slot and the second u8 is the base if its a d2x cios otherwise the slot number again.
-slot 0 is set to 1 - first = 0 and second = 1
-game config only shows the first (slot) or auto if first = 0 */
 void CMenu::_load_installed_cioses()
 {
-	if(isWiiVC)
-		return;
-	gprintf("Loading cIOS map\n");
+	/* No cIOS needed — running in Dolphin on stock IOS 58 */
 	_installed_cios[0] = 1;
-
-	for(u8 slot = 200; slot < 254; slot++)
-	{
-		u8 base = 1;
-		if(IOS_D2X(slot, &base))
-		{
-			gprintf("Found d2x base %u in slot %u\n", base, slot);
-			_installed_cios[slot] = base;
-			_cios_base[base] = slot;// these are sorted low to high. no duplicates. higher slot will replace lower slot if same base.
-		}
-		else if(CustomIOS(IOS_GetType(slot)))
-		{
-			gprintf("Found cIOS in slot %u\n", slot);
-			_installed_cios[slot] = slot;// we don't add the base for non d2x cios. only keep this if a user wants to try a hermies cios for example.
-		}
-	}
 }
 
 void CMenu::_hideWaitMessage()
@@ -2841,29 +2398,10 @@ void CMenu::RemoveCover(const char *id)
 	fsop_deleteFile(CoverPath);
 }
 
-/* if wiiflow using IOS58 this switches to cIOS for certain functions and back to IOS58 when done. */
-/* if wiiflow using cIOS no need to temp switch */
+/* No cIOS switching needed in Dolphin — always on IOS 58 */
 void CMenu::TempLoadIOS(int IOS)
 {
-	/* Only temp reload in IOS58 mode */
-	if(useMainIOS)
-		return;
-
-	if(IOS == IOS_TYPE_NORMAL_IOS)
-		IOS = 58;
-	else if(IOS == 0)
-		IOS = mainIOS;
-
-	if(CurrentIOS.Version != IOS)
-	{
-		loadIOS(IOS, true);// switch to new IOS
-		Sys_Init();
-		Open_Inputs();
-		for(int chan = WPAD_MAX_WIIMOTES-1; chan >= 0; chan--)
-			WPAD_SetVRes(chan, m_vid.width() + m_cursor[chan].width(), m_vid.height() + m_cursor[chan].height());
-		if(has_enabled_providers() || m_use_wifi_gecko)
-			_initAsyncNetwork();
-	}
+	(void)IOS;
 }
 
 static char blankCoverPath[MAX_FAT_PATH];
